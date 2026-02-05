@@ -31,16 +31,16 @@ const bytesToBase64 = (buffer: ArrayBuffer) => {
     const bytes = new Uint8Array(buffer);
     const len = bytes.byteLength;
 
-    // Quick check for all-zero input
-    const sum = bytes.reduce((acc, val) => acc + val, 0);
-    if (sum === 0) {
-        console.log("WARNING: bytesToBase64 received all-zero buffer!");
-    }
-
     // Create binary string from bytes
     let binary = '';
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
+    try {
+        // Optimized: use apply instead of loop when possible
+        binary = String.fromCharCode.apply(null, bytes as unknown as number[]);
+    } catch (e) {
+        // Fallback to loop if stack overflows
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
     }
 
     // Use btoa with proper binary string handling
@@ -49,12 +49,10 @@ const bytesToBase64 = (buffer: ArrayBuffer) => {
         // For React Native, btoa might not be available or might have issues
         // Fallback to manual encoding if needed
         if (typeof btoa !== 'undefined') {
-            const result = btoa(binary);
-            console.log("bytesToBase64 (btoa): inputLen=", len, ", sum=", sum, ", outputLen=", result.length, ", first20=", result.substring(0, 20));
-            return result;
+            return btoa(binary);
         }
     } catch (e) {
-        console.log("btoa failed, using manual encoding:", e);
+        // console.log("btoa failed, using manual encoding:", e);
     }
 
     // Manual base64 encoding (fixed implementation)
@@ -76,8 +74,6 @@ const bytesToBase64 = (buffer: ArrayBuffer) => {
         result += i + 1 < len ? chars[index3] : '=';
         result += i + 2 < len ? chars[index4] : '=';
     }
-
-    console.log("bytesToBase64 (manual): inputLen=", len, ", sum=", sum, ", outputLen=", result.length, ", first20=", result.substring(0, 20));
 
     return result;
 }
