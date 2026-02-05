@@ -9,7 +9,7 @@ from contextlib import contextmanager
 # Check for PostgreSQL dependency
 try:
     import psycopg2
-    from psycopg2.extras import RealDictCursor
+    from psycopg2.extras import RealDictCursor, execute_batch
     from psycopg2 import pool
     HAS_POSTGRES = True
 except ImportError:
@@ -535,32 +535,60 @@ def bulk_update_tasks(updates_list: List[Dict[str, Any]]) -> int:
     try:
         cur = conn.cursor()
         
+        current_batch_keys = None
+        current_batch_query = None
+        current_batch_params = []
+
+        def execute_current_batch():
+            nonlocal total_affected
+            if not current_batch_params:
+                return
+
+            if DATABASE_URL:
+                execute_batch(cur, current_batch_query, current_batch_params)
+                total_affected += len(current_batch_params)
+            else:
+                cur.executemany(current_batch_query, current_batch_params)
+                total_affected += cur.rowcount
+
         for update_item in updates_list:
             if 'id' not in update_item:
                 continue
             task_id = update_item.get('id')
 
-            fields = []
-            values = []
-
-            for key, value in update_item.items():
-                if key == 'id': continue
-                if key not in ALLOWED_TASK_COLUMNS: continue
-                fields.append(f"{key} = ?" if not DATABASE_URL else f"{key} = %s")
-                values.append(value)
+            # Determine keys to update
+            keys = sorted([k for k in update_item.keys() if k != 'id' and k in ALLOWED_TASK_COLUMNS])
+            if not keys:
+                continue
             
-            if not fields: continue
+            # Prepare values corresponding to sorted keys
+            values = [update_item[k] for k in keys]
             
-            fields.append("updated_at = ?" if not DATABASE_URL else "updated_at = %s")
+            # Add updated_at
+            keys.append('updated_at')
             values.append(updated_at)
             
-            query = f"UPDATE tasks SET {', '.join(fields)} WHERE id = ?"
-            if DATABASE_URL:
-                query = query.replace("?", "%s")
-                
+            # Tuple of keys identifies the query structure
+            keys_tuple = tuple(keys)
+
+            # Add ID to values for the WHERE clause
             values.append(task_id)
-            cur.execute(query, values)
-            total_affected += cur.rowcount
+
+            # Check if we need to switch batch
+            if keys_tuple != current_batch_keys:
+                execute_current_batch()
+
+                # Setup new batch
+                current_batch_keys = keys_tuple
+                fields = [f"{k} = %s" if DATABASE_URL else f"{k} = ?" for k in keys]
+                # WHERE id is last
+                current_batch_query = f"UPDATE tasks SET {', '.join(fields)} WHERE id = %s" if DATABASE_URL else f"UPDATE tasks SET {', '.join(fields)} WHERE id = ?"
+                current_batch_params = []
+
+            current_batch_params.append(tuple(values))
+
+        # Execute any remaining batch
+        execute_current_batch()
             
         conn.commit()
     except Exception as e:
