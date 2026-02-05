@@ -103,7 +103,7 @@ async def get_chat_history():
     """
     Returns the recent chat history for the frontend sync.
     """
-    messages = database.get_recent_messages(limit=50)
+    messages = await asyncio.to_thread(database.get_recent_messages, limit=50)
     return messages
 
 @app.post("/transcribe")
