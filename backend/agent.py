@@ -45,12 +45,12 @@ TOOL_CALLABLES = list(TOOL_FUNCTIONS.values())
 # Local definition removed in favor of prompts.get_system_context()
 
 
-def load_history_from_db() -> List[types.Content]:
+async def load_history_from_db() -> List[types.Content]:
     """
     Loads recent messages from DB and converts them to Google GenAI Content types.
     The current user message should already be saved to DB before calling this.
     """
-    _, buffer_dicts = database.get_memory_context() # Unsummarized history
+    _, buffer_dicts = await asyncio.to_thread(database.get_memory_context) # Unsummarized history
     
     contents = []
     
@@ -177,7 +177,8 @@ async def call_model(state: AgentState, config: RunnableConfig):
         tool_calls_json = json.dumps([{"name": fc.name, "args": fc.args} for fc in tool_calls])
         
     if full_text or tool_calls:
-        database.add_message(
+        await asyncio.to_thread(
+            database.add_message,
             role='assistant', 
             content=full_text, 
             tool_calls=tool_calls_json
@@ -213,14 +214,14 @@ async def execute_tools(state: AgentState, config: RunnableConfig):
                 # We could run in executor if needed, but for now direct call
                 # Note: args_dict values might be types.xxx, ensure we pass native python types?
                 # GenAI usually converts standard JSON types well.
-                result = TOOL_FUNCTIONS[name](**args_dict)
+                result = await asyncio.to_thread(TOOL_FUNCTIONS[name], **args_dict)
                 output_text = str(result)
             except Exception as e:
                 output_text = f"Error executing {name}: {str(e)}"
         
         # Save Tool Output to DB
         # We record it as a 'tool' role message
-        database.add_message(role='tool', content=output_text)
+        await asyncio.to_thread(database.add_message, role='tool', content=output_text)
 
         # Create Response Part (FunctionResponse)
         # Google GenAI expects a FunctionResponse part
@@ -319,7 +320,7 @@ async def summarize_memory_if_needed(current_summary: str, buffer_dicts: list) -
         new_summary = response.text
         
         # Save to DB
-        database.update_summary(new_summary, last_summarized_id)
+        await asyncio.to_thread(database.update_summary, new_summary, last_summarized_id)
         print("Memory Summarization Complete.")
         
         return new_summary
@@ -335,14 +336,18 @@ async def run_chat_agent_async(user_message: str, stream: bool = False):
         AsyncGenerator: If stream=True (Yields types.Part)
     """
     # 1. Save User Message
-    database.add_message('user', f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {user_message}")
+    await asyncio.to_thread(
+        database.add_message,
+        'user',
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {user_message}"
+    )
     
     # 2. Memory Summarization
-    summary_text, buffer_dicts = database.get_memory_context()
+    summary_text, buffer_dicts = await asyncio.to_thread(database.get_memory_context)
     await summarize_memory_if_needed(summary_text, buffer_dicts)
     
     # 3. Init State
-    initial_messages = load_history_from_db()
+    initial_messages = await load_history_from_db()
     state = AgentState(messages=initial_messages, user_message_str=user_message)
     
     if stream:
@@ -370,7 +375,7 @@ async def wake_cooper(reason: str):
     try:
         print(f"⚡ Waking Cooper: {reason}")
         
-        pending_tasks = database.list_tasks(status="TODO")
+        pending_tasks = await asyncio.to_thread(database.list_tasks, status="TODO")
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
         
         trigger_message = (
