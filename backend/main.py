@@ -22,6 +22,13 @@ load_dotenv()
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # Initialize Postgres DB if DATABASE_URL is set (Cloud Run)
+    if database.DATABASE_URL:
+        try:
+            database.init_postgres()
+            print("Postgres DB initialized successfully")
+        except Exception as e:
+            print(f"Postgres init error: {e}")
     start_scheduler()
     yield
     # Shutdown

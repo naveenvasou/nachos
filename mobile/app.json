@@ -29,7 +29,10 @@
       "package": "com.anonymous.nachos",
       "googleServicesFile": "./google-services.json",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "softwareKeyboardLayoutMode": "resize",
       "backgroundColor": "transparent"
@@ -63,6 +66,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "683c552c-e2e2-4ac5-93bc-53c1017feb8a"
+      }
+    },
+    "owner": "naveenvasou"
   }
 }

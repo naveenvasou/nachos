@@ -5,5 +5,12 @@ langchain
 langchain-openai
 langchain-groq
 pydantic
-langgraph
 python-dotenv
+websockets
+groq
+python-multipart
+psycopg2-binary
+apscheduler
+pytz
+httpx
+google-genai
