@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agent import run_chat_agent
 from connection_manager import manager
-from groq import Groq
+from groq import AsyncGroq
 import base64
 import wave
 import os
@@ -45,7 +45,7 @@ app.add_middleware(
 )
 
 # Initialize Groq Client for Audio
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
 
 class ChatRequest(BaseModel):
     message: str
@@ -110,23 +110,18 @@ async def get_chat_history():
 async def transcribe_audio(file: UploadFile = File(...)):
     try:
         print(f"Received file: {file.filename}, type: {file.content_type}")
-        # Create temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as tmp:
-            shutil.copyfileobj(file.file, tmp)
-            tmp_path = tmp.name
+        
+        # Read file content asynchronously
+        content = await file.read()
         
         # Transcribe with Groq
-        with open(tmp_path, "rb") as audio_file:
-            transcription = groq_client.audio.transcriptions.create(
-                file=(tmp_path, audio_file.read()),
-                model="whisper-large-v3",
-                response_format="json",
-                language="en",
-                temperature=0.0
-            )
-        
-        # Cleanup
-        os.remove(tmp_path)
+        transcription = await groq_client.audio.transcriptions.create(
+            file=(file.filename, content),
+            model="whisper-large-v3",
+            response_format="json",
+            language="en",
+            temperature=0.0
+        )
         
         return {"text": transcription.text}
     except Exception as e:
