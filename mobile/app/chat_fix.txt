@@ -1,0 +1,10 @@
+REPLACE LINES 191-205 in chat.tsx with:
+
+                            } else {
+                                // Simple: Send raw buffer as base64
+                                const bytes = new Uint8Array(buffer);
+                                const base64Str = bytesToBase64(bytes.buffer);
+                                ws.send(base64Str);
+                            }
+
+This removes ALL Float32/Int16 conversion - just sends the raw audio data.

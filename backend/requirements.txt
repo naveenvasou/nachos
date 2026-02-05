@@ -5,4 +5,5 @@ langchain
 langchain-openai
 langchain-groq
 pydantic
+langgraph
 python-dotenv

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cooper Context Inspector</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #c9d1d9;
+            --border-color: #30363d;
+            --accent-color: #58a6ff;
+            --bg-secondary: #161b22;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .column {
+            flex: 1;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .header {
+            padding: 10px 15px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            white-space: pre-wrap;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+
+        h3 {
+            margin-top: 0;
+            color: var(--accent-color);
+        }
+
+        .message {
+            background-color: var(--bg-secondary);
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .role-user {
+            border-left: 3px solid #238636;
+        }
+
+        .role-assistant {
+            border-left: 3px solid #a371f7;
+        }
+
+        .role-tool {
+            border-left: 3px solid #f0883e;
+        }
+
+        .role-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+            color: #8b949e;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+
+        button {
+            background-color: #21262d;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #30363d;
+        }
+
+        .edit-btn {
+            float: right;
+            opacity: 0.5;
+        }
+
+        .edit-btn:hover {
+            opacity: 1;
+        }
+
+        textarea.edit-mode {
+            width: 100%;
+            background: #000;
+            color: #fff;
+            border: 1px solid #58a6ff;
+            font-family: monospace;
+            min-height: 100px;
+        }
+
+        .delete-btn {
+            background-color: #da3633;
+            border-color: #da3633;
+            margin-left: 5px;
+            float: right;
+            opacity: 0.5;
+        }
+
+        .delete-btn:hover {
+            background-color: #a02624;
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- COLUMN 1: SYSTEM PROMPT -->
+    <div class="column">
+        <div class="header">
+            System Context
+            <button onclick="refreshData()">Refresh</button>
+        </div>
+        <div class="content" id="system-context">
+            Loading...
+        </div>
+    </div>
+
+    <!-- COLUMN 2: MEMORY SUMMARY -->
+    <div class="column" style="flex: 0.7;">
+        <div class="header">Memory Summary</div>
+        <div class="content" id="memory-summary">
+            Loading...
+        </div>
+    </div>
+
+    <!-- COLUMN 3: RECENT CHAT -->
+    <div class="column" style="flex: 1.3;">
+        <div class="header">Chat Stream (Recent)</div>
+        <div class="content" id="chat-stream">
+            Loading...
+        </div>
+    </div>
+
+    <script>
+        async function refreshData() {
+            try {
+                // Fetch Debug Context
+                const res = await fetch('/debug/context');
+                const data = await res.json();
+
+                // 1. Render System Prompt
+                document.getElementById('system-context').textContent = data.system_instruction;
+
+                // 2. Render Memory
+                const summary = data.memory_summary || "No summary yet.";
+                document.getElementById('memory-summary').textContent = summary;
+
+                // 3. Render Chat Stream
+                const container = document.getElementById('chat-stream');
+                container.innerHTML = '';
+
+                if (data.recent_messages) {
+                    data.recent_messages.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = `message role-${msg.role}`;
+                        div.dataset.id = msg.id;
+
+                        // Header
+                        const header = document.createElement('div');
+                        header.innerHTML = `<span class="role-label">${msg.role} [ID: ${msg.id}]</span>`;
+
+                        // Edit Button
+                        const btn = document.createElement('button');
+                        btn.className = 'edit-btn';
+                        btn.innerText = 'Edit';
+                        btn.onclick = () => enterEditMode(div, msg.id, getTextContent(msg));
+                        header.appendChild(btn);
+
+                        // Delete Button
+                        const delBtn = document.createElement('button');
+                        delBtn.className = 'delete-btn';
+                        delBtn.innerText = 'Del';
+                        delBtn.onclick = () => {
+                            if (confirm('Are you sure you want to delete this message?')) {
+                                deleteMessage(msg.id);
+                            }
+                        };
+                        header.appendChild(delBtn);
+
+                        div.appendChild(header);
+
+                        // Content
+                        const contentDiv = document.createElement('div');
+                        contentDiv.className = 'msg-body';
+                        contentDiv.innerText = getTextContent(msg);
+                        div.appendChild(contentDiv);
+
+                        container.appendChild(div);
+                    });
+
+                    // Scroll to bottom
+                    container.scrollTop = container.scrollHeight;
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert("Failed to load context. Is the backend running?");
+            }
+        }
+
+        function getTextContent(msg) {
+            let text = "";
+            if (msg.content) text += msg.content + "\n";
+            if (msg.tool_calls) {
+                try {
+                    // Try to pretty print JSON if it's a string
+                    const toolJson = JSON.parse(msg.tool_calls);
+                    text += `\n[System Log: Tool Calls]\n${JSON.stringify(toolJson, null, 2)}`;
+                } catch (e) {
+                    text += `\n[System Log: Tool Calls]\n${msg.tool_calls}`;
+                }
+            }
+            return text.trim();
+        }
+
+        function enterEditMode(div, id, currentText) {
+            const body = div.querySelector('.msg-body');
+            body.innerHTML = '';
+
+            const textarea = document.createElement('textarea');
+            textarea.className = 'edit-mode';
+            textarea.value = currentText;
+
+            const saveBtn = document.createElement('button');
+            saveBtn.innerText = 'Save';
+            saveBtn.style.marginTop = '5px';
+            saveBtn.onclick = async () => {
+                const newContent = textarea.value;
+                await fetch(`/debug/message/${id}?content=${encodeURIComponent(newContent)}`, { method: 'POST' });
+                refreshData();
+            };
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.innerText = 'Cancel';
+            cancelBtn.style.marginLeft = '5px';
+            cancelBtn.onclick = () => refreshData(); // Lazy cancel
+
+            body.appendChild(textarea);
+            body.appendChild(saveBtn);
+            body.appendChild(cancelBtn);
+        }
+
+        async function deleteMessage(id) {
+            try {
+                await fetch(`/debug/message/${id}`, { method: 'DELETE' });
+                refreshData();
+            } catch (e) {
+                console.error(e);
+                alert("Failed to delete message.");
+            }
+        }
+
+        // Init
+        refreshData();
+    </script>
+</body>
+
+</html>
