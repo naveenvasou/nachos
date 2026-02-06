@@ -21,6 +21,12 @@ async def trigger_eod_check():
     logger.info("⏰ Heartbeat: Triggering EOD Check")
     await wake_cooper(reason="EOD Check")
 
+async def trigger_midday_check():
+    """Wakes Cooper for the Mid-Day Check-In (1:30 PM)"""
+    from agent import wake_cooper
+    logger.info("⏰ Heartbeat: Triggering Mid-Day Check-In")
+    await wake_cooper(reason="Mid-Day Check-In")
+
 async def trigger_night_owl_check():
     """Wakes Cooper for the Night Owl Check (10:00 PM)"""
     from agent import wake_cooper
@@ -42,15 +48,23 @@ def start_scheduler():
             replace_existing=True
         )
 
-        # 2. EOD Check: 6:00 PM
+        # 2. Mid-Day Check-In: 1:30 PM
         scheduler.add_job(
-            trigger_eod_check, 
-            CronTrigger(hour=18, minute=0), 
+            trigger_midday_check,
+            CronTrigger(hour=13, minute=30),
+            id="midday_check",
+            replace_existing=True
+        )
+
+        # 3. EOD Check: 6:00 PM
+        scheduler.add_job(
+            trigger_eod_check,
+            CronTrigger(hour=18, minute=0),
             id="eod_check",
             replace_existing=True
         )
 
-        # 3. Night Owl Check: 10:00 PM
+        # 4. Night Owl Check: 10:00 PM
         scheduler.add_job(
             trigger_night_owl_check, 
             CronTrigger(hour=22, minute=0), 
