@@ -1156,6 +1156,16 @@ def get_wake_context() -> Dict[str, Any]:
     # Postponed tasks
     postponed = get_rescheduled_tasks(threshold=2)
 
+    # Weekly stats (useful for weekly planning heartbeat)
+    week_start = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime("%Y-%m-%d")
+    completed_this_week = sum(
+        1 for t in tasks
+        if t['status'] == 'DONE' and t.get('updated_at', '') >= week_start
+    )
+
+    # Goal progress summary
+    goal_progress = get_goal_progress()
+
     return {
         "time": now_str,
         "todays_scheduled": len(todays_tasks),
@@ -1167,6 +1177,8 @@ def get_wake_context() -> Dict[str, Any]:
         "hours_since_last_interaction": hours_since_last_interaction,
         "habits_pending_today": [{"id": h['habit_id'], "title": h['title'], "current_streak": h['current_streak']} for h in habits_not_logged],
         "postponed_tasks": [{"id": t['id'], "title": t['title'], "days_postponed": t.get('days_postponed', 0)} for t in postponed[:5]],
+        "completed_this_week": completed_this_week,
+        "goal_progress": [{"title": gp['title'], "progress_pct": gp['progress_pct'], "done": gp['done'], "total": gp['total_tasks']} for gp in goal_progress],
     }
 
 
@@ -1231,6 +1243,16 @@ def get_context_markdown() -> str:
             else:
                 progress_str = " (no linked tasks)"
             md_output += f"- [ID: {g['id']}] **{g['title']}**: {g['description']}{progress_str}{notes}\n"
+
+    # --- Goal-Task Alignment ---
+    active_tasks = [t for t in tasks if t['status'] not in ('DONE', 'CANCELLED')]
+    if active_tasks:
+        linked = sum(1 for t in active_tasks if t.get('goal_id'))
+        unlinked = len(active_tasks) - linked
+        md_output += f"\n**Alignment**: {linked}/{len(active_tasks)} active tasks linked to goals"
+        if unlinked > 0:
+            md_output += f" — {unlinked} unlinked (potential drift)"
+        md_output += "\n"
 
     md_output += "\n---\n"
 

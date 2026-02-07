@@ -33,6 +33,12 @@ async def trigger_night_owl_check():
     logger.info("⏰ Heartbeat: Triggering Night Owl Check")
     await wake_cooper(reason="Night Owl Check")
 
+async def trigger_weekly_planning():
+    """Wakes Cooper for Weekly Planning (Sunday 7:00 PM)"""
+    from agent import wake_cooper
+    logger.info("⏰ Heartbeat: Triggering Weekly Planning")
+    await wake_cooper(reason="Weekly Planning")
+
 def start_scheduler():
     """Starts the proactive scheduler"""
     if not scheduler.running:
@@ -66,9 +72,17 @@ def start_scheduler():
 
         # 4. Night Owl Check: 10:00 PM
         scheduler.add_job(
-            trigger_night_owl_check, 
-            CronTrigger(hour=22, minute=0), 
+            trigger_night_owl_check,
+            CronTrigger(hour=22, minute=0),
             id="night_owl_check",
+            replace_existing=True
+        )
+
+        # 5. Weekly Planning: Sunday 7:00 PM
+        scheduler.add_job(
+            trigger_weekly_planning,
+            CronTrigger(day_of_week='sun', hour=19, minute=0),
+            id="weekly_planning",
             replace_existing=True
         )
 
