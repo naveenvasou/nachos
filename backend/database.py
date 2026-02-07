@@ -437,55 +437,29 @@ def get_push_tokens() -> List[str]:
         return [row['push_token'] for row in rows]
 
 def add_message(role: str, content: str, tool_calls: Optional[List[Dict]] = None, tool_call_id: Optional[str] = None) -> int:
-    with get_cursor() as c:
-        created_at = datetime.now().isoformat()
-        tool_calls_json = json.dumps(tool_calls) if tool_calls else None
-        
-        query = "INSERT INTO messages (role, content, tool_calls, tool_call_id, created_at) VALUES (?, ?, ?, ?, ?)"
-        query = normalize_query(query)
-        
-        c.execute(query, (role, content, tool_calls_json, tool_call_id, created_at))
-        
-        if DATABASE_URL:
-            # Postgres needs explicit RETURNING for ID if using psycopg2 directly sometimes, but lastrowid doesn't work well
-            # Actually, standard SQL is returning id.
-            # But let's fix the query for Postgres to return ID.
-            pass
-        
-        if DATABASE_URL:
-            # We need to execute a Fetch to get the ID for postgres
-            # The previous execute didn't return anything.
-            # Let's adjust logic.
-            # We can't easily retro-fix the previous execute.
-            # We should use RETURNING id in the insert for Postgres.
-            pass
-
-    # RE-DOING add_message to handle RETURNING ID correctly across both
     conn = get_db_connection()
     try:
+        cur = conn.cursor()
+        created_at = datetime.now().isoformat()
+        tool_calls_json = json.dumps(tool_calls) if tool_calls else None
+
         if DATABASE_URL:
-            cur = conn.cursor()
-            created_at = datetime.now().isoformat()
-            tool_calls_json = json.dumps(tool_calls) if tool_calls else None
-            
-            cur.execute("""
-                INSERT INTO messages (role, content, tool_calls, tool_call_id, created_at) 
-                VALUES (%s, %s, %s, %s, %s) RETURNING id
-            """, (role, content, tool_calls_json, tool_call_id, created_at))
+            cur.execute(
+                "INSERT INTO messages (role, content, tool_calls, tool_call_id, created_at) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                (role, content, tool_calls_json, tool_call_id, created_at)
+            )
             msg_id = cur.fetchone()[0]
-            conn.commit()
-            return msg_id
         else:
-            cur = conn.cursor()
-            created_at = datetime.now().isoformat()
-            tool_calls_json = json.dumps(tool_calls) if tool_calls else None
-            cur.execute('''
-                INSERT INTO messages (role, content, tool_calls, tool_call_id, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (role, content, tool_calls_json, tool_call_id, created_at))
+            cur.execute(
+                "INSERT INTO messages (role, content, tool_calls, tool_call_id, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (role, content, tool_calls_json, tool_call_id, created_at)
+            )
             msg_id = cur.lastrowid
-            conn.commit()
-            return msg_id
+
+        conn.commit()
+        return msg_id
     finally:
         release_db_connection(conn)
 
