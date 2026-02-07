@@ -36,31 +36,29 @@ All messages include timestamps, so you have a sense of the conversation flow an
 
 import database
 
-def get_system_context() -> str:
+def get_system_context(summary_text: str = None) -> str:
     """
     Combines System Prompt + Heartbeat + Tasks + Summary into the full context.
-    MOVED HERE TO BE SHARED BY AGENT AND DEBUGGER.
+    Accepts an optional pre-fetched summary_text to avoid a redundant DB call.
     """
-    
-    # Task Context — read directly from DB for freshness (no stale file reads)
     try:
         task_context = database.get_context_markdown()
-    except:
+    except Exception:
         task_context = "No tasks or goals found."
 
-    # Heartbeat
     try:
         with open(os.path.join(PROMPTS_DIR, 'heartbeat.md'), 'r', encoding='utf-8') as f:
             heartbeat_context = f.read()
-    except:
+    except Exception:
         heartbeat_context = ""
 
-    # Memory Summary
-    summary_text, _ = database.get_memory_context()
-    
+    # Only hit the DB if caller didn't pass a cached summary
+    if summary_text is None:
+        summary_text, _ = database.get_memory_context()
+
     full_prompt = f"{SYSTEM_PROMPT_GOAL_COACH}\n\n{heartbeat_context}\n\n{task_context}"
     if summary_text:
         full_prompt += f"\n\nPREVIOUS CONVERSATION SUMMARY:\n{summary_text}"
-        
+
     return full_prompt
 
