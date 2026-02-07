@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Path, Text as SvgText, TextPath, Defs } from 'react-native-svg';
 
 export default function HeroCard() {
+    // Dynamic date formatting
+    const formattedDate = useMemo(() => {
+        const now = new Date();
+        const day = now.getDate();
+        const month = now.toLocaleString('default', { month: 'long' });
+        return `${day} ${month}`;
+    }, []);
+
     return (
         <View style={styles.container}>
 
@@ -11,7 +19,7 @@ export default function HeroCard() {
             <View style={styles.headerRow}>
                 <View style={styles.dateBadge}>
                     <MaterialIcons name="calendar-today" size={16} color="#4b5563" />
-                    <Text style={styles.dateText}>8 June</Text>
+                    <Text style={styles.dateText}>{formattedDate}</Text>
                 </View>
                 <View style={styles.reportBadge}>
                     <Text style={styles.reportText}>AI-REPORT</Text>
@@ -112,7 +120,7 @@ const styles = StyleSheet.create({
     textContent: {
         zIndex: 10,
         marginTop: 16,
-        
+
     },
     subLabel: {
         fontFamily: 'PlusJakartaSans_600SemiBold',

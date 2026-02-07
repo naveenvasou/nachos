@@ -3,8 +3,8 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Platform, Alert }
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
-// Backend deployed on Google Cloud Run
-const API_URL = 'https://nachos-backend-728473520070.us-central1.run.app';
+// Centralized API config
+import { API_URL } from '../../constants/api';
 
 export default function MixedFeed() {
     const [tasks, setTasks] = useState<any[]>([]);
@@ -97,7 +97,18 @@ export default function MixedFeed() {
                 <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Today's Tasks</Text>
 
                 {isLoading ? (
-                    <Text style={{ color: '#9ca3af', fontFamily: 'PlusJakartaSans_500Medium' }}>Loading tasks...</Text>
+                    <View style={styles.taskContainer}>
+                        {/* Skeleton loading placeholders */}
+                        {[1, 2, 3].map((i) => (
+                            <View key={i} style={styles.taskRow}>
+                                <View style={[styles.checkbox, styles.skeleton]} />
+                                <View style={{ flex: 1, gap: 6 }}>
+                                    <View style={[styles.skeletonLine, { width: '70%' }]} />
+                                    <View style={[styles.skeletonLine, { width: '40%', height: 10 }]} />
+                                </View>
+                            </View>
+                        ))}
+                    </View>
                 ) : tasks.length === 0 ? (
                     <Text style={{ color: '#9ca3af', fontFamily: 'PlusJakartaSans_500Medium' }}>No tasks scheduled for today. Explore the backlog?</Text>
                 ) : (
@@ -240,5 +251,15 @@ const styles = StyleSheet.create({
     taskTextCompleted: {
         color: '#9ca3af', // text-gray-400
         textDecorationLine: 'line-through',
+    },
+    // Skeleton loading styles
+    skeleton: {
+        backgroundColor: '#e5e7eb',
+        borderColor: '#e5e7eb',
+    },
+    skeletonLine: {
+        height: 14,
+        backgroundColor: '#e5e7eb',
+        borderRadius: 4,
     },
 });

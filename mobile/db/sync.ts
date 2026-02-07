@@ -1,7 +1,10 @@
 import { synchronize } from '@nozbe/watermelondb/sync'
 import { database } from './index'
 
-const API_URL = 'http://10.0.2.2:8000'; // Android Emulator localhost alias
+// Centralized API config
+import { getApiUrl } from '../constants/api';
+
+const API_URL = getApiUrl();
 
 export async function syncData() {
     await synchronize({

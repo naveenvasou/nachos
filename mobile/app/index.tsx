@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, Platform, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { StyleSheet, View, Text, ScrollView, Platform, TouchableOpacity, StatusBar, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,8 +11,21 @@ import * as SplashScreen from 'expo-splash-screen';
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
+// Helper function for time-based greeting
+function getGreeting(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 17) return 'Good Afternoon,';
+    return 'Good Evening,';
+}
+
 export default function HomeScreen() {
     const insets = useSafeAreaInsets();
+    const [refreshing, setRefreshing] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    // Dynamic greeting based on time of day
+    const greeting = useMemo(() => getGreeting(), []);
 
     let [fontsLoaded] = useFonts({
         PlusJakartaSans_400Regular,
@@ -28,6 +41,17 @@ export default function HomeScreen() {
         }
     }, [fontsLoaded]);
 
+    // Pull-to-refresh handler
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        // Trigger re-render of child components by updating key
+        setRefreshKey(prev => prev + 1);
+        // Simulate network delay
+        setTimeout(() => {
+            setRefreshing(false);
+        }, 1000);
+    }, []);
+
     if (!fontsLoaded) {
         return null;
     }
@@ -42,16 +66,24 @@ export default function HomeScreen() {
                     <ScrollView
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={styles.scrollContent}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor="#000"
+                                colors={['#000']}
+                            />
+                        }
                     >
                         {/* Header - Moved inside ScrollView */}
                         <View style={styles.header}>
                             <View>
-                                <Text style={styles.greeting}>Good Morning,</Text>
+                                <Text style={styles.greeting}>{greeting}</Text>
                                 <Text style={styles.userName}>Naveen</Text>
                             </View>
                             <TouchableOpacity>
                                 <View style={styles.avatarContainer}>
-                                    <Text style={styles.avatarText}>J</Text>
+                                    <Text style={styles.avatarText}>N</Text>
                                 </View>
                             </TouchableOpacity>
                         </View>
@@ -63,7 +95,7 @@ export default function HomeScreen() {
                         <UtilityGrid />
 
                         {/* Feed - The Agenda/Tasks */}
-                        <MixedFeed />
+                        <MixedFeed key={refreshKey} />
 
                         <View style={{ height: 100 }} /> {/* Spacer for Floating Bar */}
 
