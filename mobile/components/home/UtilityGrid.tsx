@@ -47,7 +47,7 @@ export default function UtilityGrid() {
                     onPress={() => router.push('/strategy' as any)}
                 >
                     <View style={[styles.iconCircle, styles.iconStrategize]}>
-                        <MaterialIcons name="map" size={24} color="#ffff" />
+                        <MaterialIcons name="map" size={24} color="#fff" />
                     </View>
                     <Text style={styles.cardTitleStrategize}>Strategize</Text>
                 </TouchableOpacity>

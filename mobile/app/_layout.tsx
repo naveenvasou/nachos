@@ -3,8 +3,8 @@ import { useEffect } from 'react';
 import notifee, { EventType } from '@notifee/react-native';
 import { Platform } from 'react-native';
 
-// TODO: centralized config
-const API_URL = "https://nachos-backend-728473520070.us-central1.run.app";
+// Centralized API config
+import { API_URL } from '../constants/api';
 
 export default function Layout() {
   const router = useRouter();
