@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, SafeArea
 import { ChoiceCard } from '@/components/ChoiceCard';
 import { ContractCard } from '@/components/ContractCard';
 
-const API_URL = "https://unsignificantly-logarithmic-deetta.ngrok-free.dev";
+const API_URL = "https://nachos-backend-728473520070.us-central1.run.app";
 
 interface Message {
   id: string;

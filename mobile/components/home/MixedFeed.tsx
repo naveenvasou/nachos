@@ -3,9 +3,8 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Platform, Alert }
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
-// Basic configuration for Dev environment
-// Using Ngrok for physical device testing
-const API_URL = 'https://unsignificantly-logarithmic-deetta.ngrok-free.dev';
+// Backend deployed on Google Cloud Run
+const API_URL = 'https://nachos-backend-728473520070.us-central1.run.app';
 
 export default function MixedFeed() {
     const [tasks, setTasks] = useState<any[]>([]);

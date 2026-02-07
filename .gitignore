@@ -11,3 +11,4 @@ idb_connected
 venv/
 __pycache__/
 .env
+.claude

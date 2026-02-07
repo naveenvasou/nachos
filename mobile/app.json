@@ -33,7 +33,9 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "softwareKeyboardLayoutMode": "resize",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true
     },
     "androidStatusBar": {
       "translucent": true,
