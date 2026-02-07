@@ -195,6 +195,214 @@ def bulk_update_tasks(updates: List[Dict[str, Any]]) -> str:
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)})
 
+# --- ANALYTICS TOOLS ---
+
+def get_task_stats() -> str:
+    """
+    Returns productivity analytics: completion rate, overdue count, tasks done this week,
+    average completion time, and status breakdown. Use this to give the user data-driven insights.
+
+    Returns:
+        JSON string with stats.
+    """
+    try:
+        stats = database.get_task_stats()
+        return json.dumps(stats)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def get_overdue_tasks() -> str:
+    """
+    Returns all tasks that are past their due_date and not yet completed.
+    Each task includes a 'days_overdue' count. Use this to flag urgent items.
+
+    Returns:
+        JSON string with overdue task list.
+    """
+    try:
+        overdue = database.get_overdue_tasks()
+        return json.dumps(overdue)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def get_goal_progress(goal_id: Optional[int] = None) -> str:
+    """
+    Returns progress metrics for goals: total tasks, done, in_progress, blocked, overdue, and progress percentage.
+    If goal_id is provided, returns data for that specific goal. Otherwise returns all active goals.
+
+    Args:
+        goal_id: Optional specific goal ID to check. If omitted, all goals are returned.
+
+    Returns:
+        JSON string with goal progress data.
+    """
+    try:
+        progress = database.get_goal_progress(goal_id)
+        return json.dumps(progress)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def get_rescheduled_tasks(threshold: int = 2) -> str:
+    """
+    Returns tasks that have been sitting with a past scheduled_date but are still TODO.
+    These are likely tasks the user keeps postponing. Use this for pattern recognition.
+
+    Args:
+        threshold: Minimum number of days past scheduled_date to include. Default 2.
+
+    Returns:
+        JSON string with postponed tasks and days_postponed count.
+    """
+    try:
+        postponed = database.get_rescheduled_tasks(threshold)
+        return json.dumps(postponed)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def get_streak_data() -> str:
+    """
+    Returns the user's productivity streak: consecutive days with at least one task completed,
+    plus longest streak ever and total productive days.
+
+    Returns:
+        JSON string with streak data.
+    """
+    try:
+        streaks = database.get_streak_data()
+        return json.dumps(streaks)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+# --- HABIT TOOLS ---
+
+def create_habit(title: str, frequency: str = "daily", goal_id: Optional[int] = None) -> str:
+    """
+    Creates a new recurring habit to track.
+
+    Args:
+        title: Name of the habit (e.g. "Morning Run", "Read 30 minutes").
+        frequency: How often — "daily", "weekdays", "MWF", "TTh", or "weekly". Default "daily".
+        goal_id: Optional goal this habit contributes to.
+
+    Returns:
+        JSON string with the new habit ID.
+    """
+    try:
+        habit_id = database.create_habit(title, frequency, goal_id)
+        return json.dumps({"status": "success", "message": f"Habit '{title}' created ({frequency}).", "habit_id": habit_id})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def log_habit(habit_id: int, status: str = "done", skip_reason: str = "") -> str:
+    """
+    Logs a habit entry for today. Call this when the user completes or skips a habit.
+
+    Args:
+        habit_id: The ID of the habit.
+        status: "done" or "skipped".
+        skip_reason: If skipped, why? (e.g. "sick", "traveling")
+
+    Returns:
+        JSON confirmation.
+    """
+    try:
+        log_id = database.log_habit(habit_id, status=status, skip_reason=skip_reason)
+        return json.dumps({"status": "success", "message": f"Habit {habit_id} logged as '{status}'.", "log_id": log_id})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def get_habit_streaks() -> str:
+    """
+    Returns streak data for all active habits: current streak, longest streak,
+    completion rate, and whether the habit has been logged today.
+
+    Returns:
+        JSON string with per-habit streak data.
+    """
+    try:
+        streaks = database.get_habit_streaks()
+        return json.dumps(streaks)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+# --- USER PROFILE TOOLS ---
+
+def update_profile(key: str, value: str) -> str:
+    """
+    Stores a persistent fact about the user in their profile.
+    Use this to remember preferences, patterns, and important personal context
+    that should NEVER be lost to memory summarization.
+
+    Args:
+        key: The profile key (e.g. "preferred_work_hours", "energy_pattern",
+             "communication_style", "wake_time", "sleep_time", "motivation_style",
+             "biggest_goal", "check_in_preference", "focus_blocks", "timezone").
+        value: The value to store.
+
+    Returns:
+        JSON confirmation.
+    """
+    try:
+        database.set_profile(key, value)
+        return json.dumps({"status": "success", "message": f"Profile updated: {key} = {value}"})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def get_profile() -> str:
+    """
+    Returns the full user profile — all stored preferences, patterns, and personal context.
+
+    Returns:
+        JSON string with key-value profile data.
+    """
+    try:
+        profile = database.get_profile()
+        return json.dumps(profile)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+# --- REFLECTION TOOLS ---
+
+def save_reflection(content: str, reflection_type: str = "daily") -> str:
+    """
+    Saves a reflection or journal entry. Use after daily check-ins, weekly retros,
+    or when the user shares a meaningful insight about their progress.
+
+    Args:
+        content: The reflection text (Cooper's summary of the user's insight).
+        reflection_type: "daily", "weekly", or "milestone".
+
+    Returns:
+        JSON confirmation with reflection ID.
+    """
+    try:
+        rid = database.save_reflection(content, reflection_type)
+        return json.dumps({"status": "success", "message": "Reflection saved.", "reflection_id": rid})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def get_recent_reflections(limit: int = 5, reflection_type: Optional[str] = None) -> str:
+    """
+    Retrieves recent reflections/journal entries. Use during weekly retros or
+    to reference past insights ("Last week you said...").
+
+    Args:
+        limit: Number of reflections to return. Default 5.
+        reflection_type: Optional filter by type ("daily", "weekly", "milestone").
+
+    Returns:
+        JSON string with list of reflections.
+    """
+    try:
+        refs = database.get_recent_reflections(limit, reflection_type)
+        return json.dumps(refs)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
 def schedule_wake_up(minutes: int, reason: str) -> str:
     """
     Schedules Cooper to wake up proactively after a set number of minutes.

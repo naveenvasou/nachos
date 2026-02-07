@@ -25,6 +25,7 @@ MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 # Define Tool Functions Map
 TOOL_FUNCTIONS = {
+    # Core CRUD
     "create_task": tools.create_task,
     "update_task": tools.update_task,
     "delete_task": tools.delete_task,
@@ -33,7 +34,24 @@ TOOL_FUNCTIONS = {
     "update_goal": tools.update_goal,
     "list_tasks": tools.list_tasks,
     "list_goals": tools.list_goals,
-    "schedule_wake_up": tools.schedule_wake_up
+    # Analytics
+    "get_task_stats": tools.get_task_stats,
+    "get_overdue_tasks": tools.get_overdue_tasks,
+    "get_goal_progress": tools.get_goal_progress,
+    "get_rescheduled_tasks": tools.get_rescheduled_tasks,
+    "get_streak_data": tools.get_streak_data,
+    # Habits
+    "create_habit": tools.create_habit,
+    "log_habit": tools.log_habit,
+    "get_habit_streaks": tools.get_habit_streaks,
+    # User Profile
+    "update_profile": tools.update_profile,
+    "get_profile": tools.get_profile,
+    # Reflections
+    "save_reflection": tools.save_reflection,
+    "get_recent_reflections": tools.get_recent_reflections,
+    # Proactive
+    "schedule_wake_up": tools.schedule_wake_up,
 }
 
 # The SDK expects the actual list of functions for configuration
@@ -275,12 +293,12 @@ async def _stream_generator(state: AgentState):
 
 async def summarize_memory_if_needed(current_summary: str, buffer_dicts: list) -> str:
     """
-    Checks if buffer is too large (40+). If so, summarizes the first 20 items.
-    Updates the database with the new summary and returns the updated summary string.
+    Checks if buffer is too large (40+). If so, summarizes the first 20 items
+    using structured sections to preserve critical context.
     """
     if len(buffer_dicts) <= 40:
         return current_summary
-    
+
     # Slice the oldest 20 messages for summarization
     chunk_to_summarize = buffer_dicts[:20]
     last_summarized_id = chunk_to_summarize[-1]['id']
@@ -292,24 +310,44 @@ async def summarize_memory_if_needed(current_summary: str, buffer_dicts: list) -
         content = msg['content'] or (f"[Tool Call] {msg['tool_calls']}" if msg['tool_calls'] else "")
         text_log += f"{role}: {content}\n"
 
-    # Summarization Prompt
+    # Structured Summarization Prompt
     summary_prompt = f"""
-    You are optimizing the memory for an AI Goal Coach named Cooper.
-    
-    EXISTING LONG-TERM SUMMARY:
-    {current_summary}
-    
-    NEW CHUNK OF CONVERSATION TO MERGE:
-    {text_log}
-    
-    INSTRUCTIONS:
-    Update the "Existing Long-Term Summary" to include key relevant details from the "New Chunk".
-    - Keep it concise.
-    - Retain user preferences, major decisions, goals defined, and tasks created.
-    - Discard trivial chit-chat.
-    - Output ONLY the new summary text.
-    """
-    
+You are optimizing the memory for an AI Goal Coach named Cooper.
+
+EXISTING LONG-TERM SUMMARY:
+{current_summary}
+
+NEW CHUNK OF CONVERSATION TO MERGE:
+{text_log}
+
+INSTRUCTIONS:
+Produce an updated summary using EXACTLY these sections. Merge new information into existing sections.
+
+## User Profile Facts
+Key facts about the user: name, work schedule, energy patterns, communication style, preferences.
+Only include facts explicitly stated or strongly implied by the user.
+
+## Active Commitments
+Goals, tasks, and habits the user has committed to. Include deadlines if mentioned.
+
+## Open Loops
+Things that were discussed but not resolved — pending decisions, unanswered questions,
+tasks the user said they'd do but haven't confirmed completion of.
+
+## Patterns & Insights
+Recurring behaviors noticed: procrastination patterns, peak productivity times,
+common blockers, what motivates the user, what causes them to stall.
+
+## Recent Decisions
+Key decisions made in the most recent conversations (last 2-3 sessions).
+
+RULES:
+- Keep each section concise (2-5 bullet points max).
+- If a section has no content, write "None yet."
+- Discard trivial chit-chat.
+- Output ONLY the structured summary — no preamble.
+"""
+
     print(f"Triggering Memory Summarization (Chunk size: {len(chunk_to_summarize)})...")
     try:
         response = await client.aio.models.generate_content(
@@ -317,11 +355,11 @@ async def summarize_memory_if_needed(current_summary: str, buffer_dicts: list) -
             contents=summary_prompt
         )
         new_summary = response.text
-        
+
         # Save to DB
         database.update_summary(new_summary, last_summarized_id)
         print("Memory Summarization Complete.")
-        
+
         return new_summary
     except Exception as e:
         print(f"Summarization Failed: {e}")
@@ -366,32 +404,65 @@ run_chat_agent = run_chat_agent_async
 async def wake_cooper(reason: str):
     """
     Proactive entry point. Called by the scheduler.
+    Now includes rich context so Cooper can make intelligent decisions.
     """
     try:
         print(f"⚡ Waking Cooper: {reason}")
-        
-        pending_tasks = database.list_tasks(status="TODO")
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-        
-        trigger_message = (
-            f"[SYSTEM EVENT]\n"
-            f"**Action**: PROACTIVE WAKE UP\n"
-            f"**Reason**: {reason}\n"
-            f"**Time**: {now_str}\n"
-            f"**Pending Tasks**: {len(pending_tasks)}\n"
-            f"**Instruction**: Decide to Speak, Sleep, or Schedule."
-        )
-        
+
+        # Build rich context payload
+        ctx = database.get_wake_context()
+
+        # Format context into readable system event
+        sections = []
+        sections.append(f"[SYSTEM EVENT]")
+        sections.append(f"**Action**: PROACTIVE WAKE UP")
+        sections.append(f"**Reason**: {reason}")
+        sections.append(f"**Time**: {ctx['time']}")
+
+        # Today's progress
+        sections.append(f"\n**Today's Tasks**: {ctx['todays_done']}/{ctx['todays_scheduled']} complete")
+        if ctx['todays_remaining']:
+            remaining_str = ", ".join(f"'{t['title']}' ({t['priority']})" for t in ctx['todays_remaining'][:5])
+            sections.append(f"**Remaining Today**: {remaining_str}")
+
+        # Overdue
+        if ctx['overdue_count'] > 0:
+            overdue_str = ", ".join(f"'{t['title']}' ({t['days_overdue']}d overdue)" for t in ctx['overdue_tasks'][:3])
+            sections.append(f"**OVERDUE ({ctx['overdue_count']})**: {overdue_str}")
+
+        # Blocked
+        if ctx['blocked_tasks']:
+            blocked_str = ", ".join(f"'{t['title']}' (Reason: {t['blocker_reason']})" for t in ctx['blocked_tasks'][:3])
+            sections.append(f"**BLOCKED**: {blocked_str}")
+
+        # Habits
+        if ctx['habits_pending_today']:
+            habits_str = ", ".join(f"'{h['title']}' (streak: {h['current_streak']}d)" for h in ctx['habits_pending_today'][:5])
+            sections.append(f"**Habits Not Logged Today**: {habits_str}")
+
+        # Postponed
+        if ctx['postponed_tasks']:
+            postponed_str = ", ".join(f"'{t['title']}' ({t['days_postponed']}d)" for t in ctx['postponed_tasks'][:3])
+            sections.append(f"**Repeatedly Postponed**: {postponed_str}")
+
+        # Last interaction
+        if ctx['hours_since_last_interaction'] is not None:
+            sections.append(f"**Hours Since Last User Message**: {ctx['hours_since_last_interaction']}")
+
+        sections.append(f"\n**Instruction**: Based on the above context, decide to Speak, Sleep, or Schedule.")
+
+        trigger_message = "\n".join(sections)
+
         # Run Agent (No stream)
         response_text = await run_chat_agent_async(user_message=trigger_message, stream=False)
-        
+
         if "SLEEP" in response_text:
             print("💤 Cooper decided to sleep.")
             return
-            
+
         from connection_manager import manager
         print(f"🗣️ Cooper speaks: {response_text}")
         await manager.broadcast_message(response_text)
-        
+
     except Exception as e:
         print(f"❌ Error in wake_cooper: {e}")
