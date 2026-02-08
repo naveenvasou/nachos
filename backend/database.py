@@ -642,7 +642,7 @@ def bulk_update_tasks(updates_list: List[Dict[str, Any]]) -> int:
         
     return total_affected
 
-def get_recent_messages(limit: int = 50) -> List[Dict[str, Any]]:
+def get_recent_messages(limit: int = 50, include_tool_calls: bool = True) -> List[Dict[str, Any]]:
     with get_cursor() as c:
         if DATABASE_URL:
              # Postgres subquery layout
@@ -677,6 +677,8 @@ def get_recent_messages(limit: int = 50) -> List[Dict[str, Any]]:
         msg = dict(row) # ensure dict
         content = msg.get('content') or ""
         
+        if not include_tool_calls and msg['role'] == 'tool':
+            continue
         if msg['role'] == 'user' and "[SYSTEM EVENT]" in content:
             continue
         if msg['role'] == 'assistant' and "SLEEP" in content:

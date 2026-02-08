@@ -103,7 +103,7 @@ async def get_chat_history():
     """
     Returns the recent chat history for the frontend sync.
     """
-    messages = database.get_recent_messages(limit=50)
+    messages = database.get_recent_messages(limit=50, include_tool_calls=False)
     return messages
 
 @app.post("/transcribe")
