@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withTiming,
+    cancelAnimation
+} from 'react-native-reanimated';
 
 interface MicButtonProps {
     isRecording: boolean;
@@ -11,6 +19,7 @@ interface MicButtonProps {
 
 export default function MicButton({ isRecording, onStartRecording, onStopRecording, isProcessing = false }: MicButtonProps) {
     const [duration, setDuration] = useState(0);
+    const pulseScale = useSharedValue(1);
 
     // Timer effect dependent on isRecording prop
     useEffect(() => {
@@ -27,6 +36,27 @@ export default function MicButton({ isRecording, onStartRecording, onStopRecordi
             if (interval) clearInterval(interval);
         };
     }, [isRecording]);
+
+    // Pulsing animation for recording state
+    useEffect(() => {
+        if (isRecording) {
+            pulseScale.value = withRepeat(
+                withSequence(
+                    withTiming(1.15, { duration: 500 }),
+                    withTiming(1, { duration: 500 })
+                ),
+                -1, // Infinite repeat
+                true
+            );
+        } else {
+            cancelAnimation(pulseScale);
+            pulseScale.value = withTiming(1, { duration: 200 });
+        }
+    }, [isRecording]);
+
+    const animatedButtonStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pulseScale.value }],
+    }));
 
     const handlePress = () => {
         if (isRecording) {
@@ -55,22 +85,24 @@ export default function MicButton({ isRecording, onStartRecording, onStopRecordi
         <View style={styles.container}>
             {isRecording && (
                 <View style={styles.timerTag}>
-                    <View style={styles.redDot} />
+                    <Animated.View style={[styles.redDot, { transform: [{ scale: pulseScale.value }] }]} />
                     <Text style={styles.timerText}>{formatTime(duration)}</Text>
                 </View>
             )}
 
-            <TouchableOpacity
-                style={[styles.button, isRecording && styles.recordingButton]}
-                onPress={handlePress}
-                activeOpacity={0.7}
-            >
-                <Feather
-                    name={isRecording ? "square" : "mic"}
-                    size={20}
-                    color={isRecording ? "#EF4444" : "#6B7280"}
-                />
-            </TouchableOpacity>
+            <Animated.View style={isRecording ? animatedButtonStyle : undefined}>
+                <TouchableOpacity
+                    style={[styles.button, isRecording && styles.recordingButton]}
+                    onPress={handlePress}
+                    activeOpacity={0.7}
+                >
+                    <Feather
+                        name={isRecording ? "square" : "mic"}
+                        size={20}
+                        color={isRecording ? "#EF4444" : "#6B7280"}
+                    />
+                </TouchableOpacity>
+            </Animated.View>
         </View>
     );
 }

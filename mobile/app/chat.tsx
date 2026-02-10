@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Platform, StatusBar, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -15,7 +15,9 @@ import { KeyboardProvider, KeyboardStickyView } from 'react-native-keyboard-cont
 import LiveAudioStream from 'react-native-live-audio-stream';
 import { Audio } from 'expo-av';
 
-const API_URL = "https://nachos-backend-728473520070.us-central1.run.app";
+// Centralized API config
+import { API_URL, getWsUrl } from '../constants/api';
+
 const STORAGE_KEY = 'cooper_chat_history_v1';
 const HEADER_HEIGHT = 60;
 
@@ -24,6 +26,142 @@ interface Message {
     sender: 'ai' | 'user';
     text: string;
 }
+
+// Styles moved above components so they can be referenced by memoized components
+const markdownStyles = StyleSheet.create({
+    body: { fontSize: 16, color: '#1a1a1a', lineHeight: 24, fontFamily: 'System' },
+    paragraph: { marginBottom: 10 },
+    heading1: { fontSize: 22, fontWeight: '700', marginVertical: 10, color: '#000' },
+    heading2: { fontSize: 20, fontWeight: '600', marginVertical: 8, color: '#000' },
+    heading3: { fontSize: 18, fontWeight: '600', marginVertical: 6, color: '#000' },
+    list_item: { marginBottom: 6 },
+    bullet_list_icon: { marginLeft: 0, marginRight: 8, fontSize: 16, color: '#1a1a1a' },
+    code_inline: {
+        backgroundColor: '#f0f0f0',
+        padding: 2,
+        borderRadius: 4,
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        fontSize: 14
+    },
+    code_block: { backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8, marginVertical: 10, borderWidth: 0 },
+    fence: { backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8, marginVertical: 10, borderWidth: 0 },
+    link: { color: '#007AFF', textDecorationLine: 'none' },
+    strong: { fontWeight: '700', color: '#000' },
+});
+
+const styles = StyleSheet.create({
+    mainContainer: { flex: 1, backgroundColor: 'transparent' },
+    contentContainer: { flex: 1, backgroundColor: 'transparent' },
+    header: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+    },
+    iconButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 3
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a' },
+    chatListContent: { paddingBottom: 100 },
+    messageRow: { flexDirection: 'row', marginBottom: 12, width: '100%' },
+    userRow: { justifyContent: 'flex-end', paddingRight: 16 },
+    aiRow: { justifyContent: 'flex-start' },
+    messageBubble: {
+        padding: 14,
+        borderRadius: 20,
+        maxWidth: '80%',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1
+    },
+    userBubble: { backgroundColor: '#000000', borderBottomRightRadius: 4 },
+    messageText: { fontSize: 16, lineHeight: 24 },
+    userText: { color: '#FFFFFF' },
+    loadingContainer: { padding: 10, marginLeft: 16 },
+    stickyView: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'transparent',
+    },
+    inputWrapper: {
+        width: '100%',
+        paddingHorizontal: 20,
+        backgroundColor: '#FFFFFF',
+        paddingTop: 10,
+    },
+    floatingInputBar: {
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 30,
+        padding: 6,
+        paddingLeft: 20,
+        width: '100%',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 5,
+        alignItems: 'center',
+    },
+    input: {
+        flex: 1,
+        fontSize: 16,
+        color: '#000',
+        paddingVertical: 10,
+        maxHeight: 100,
+        paddingRight: 10
+    },
+    sendButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#000',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    sendButtonDisabled: { backgroundColor: '#E0E0E0' },
+});
+
+// Memoized message component to prevent re-renders
+const MessageItem = memo(({ item }: { item: Message }) => {
+    const isUser = item.sender === 'user';
+
+    if (isUser) {
+        return (
+            <View style={[styles.messageRow, styles.userRow]}>
+                <View style={[styles.messageBubble, styles.userBubble]}>
+                    <Text style={[styles.messageText, styles.userText]}>{item.text}</Text>
+                </View>
+            </View>
+        );
+    }
+
+    return (
+        <View style={[styles.messageRow, styles.aiRow, { paddingLeft: 16, paddingRight: 16, paddingVertical: 8 }]}>
+            <Markdown style={markdownStyles}>
+                {item.text}
+            </Markdown>
+        </View>
+    );
+});
 
 export default function ChatScreen() {
     const router = useRouter();
@@ -144,7 +282,7 @@ export default function ChatScreen() {
             const baseText = inputText || '';
 
             // Connect WebSocket
-            const wsUrl = API_URL.replace(/^http/, 'ws') + '/ws/transcribe';
+            const wsUrl = getWsUrl() + '/ws/transcribe';
             const ws = new WebSocket(wsUrl);
             socketRef.current = ws;
 
@@ -265,27 +403,10 @@ export default function ChatScreen() {
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }, [messages, isLoading]);
 
-    const renderItem = ({ item }: { item: Message }) => {
-        const isUser = item.sender === 'user';
-
-        if (isUser) {
-            return (
-                <View style={[styles.messageRow, styles.userRow]}>
-                    <View style={[styles.messageBubble, styles.userBubble]}>
-                        <Text style={[styles.messageText, styles.userText]}>{item.text}</Text>
-                    </View>
-                </View>
-            );
-        }
-
-        return (
-            <View style={[styles.messageRow, styles.aiRow, { paddingLeft: 16, paddingRight: 16, paddingVertical: 8 }]}>
-                <Markdown style={markdownStyles}>
-                    {item.text}
-                </Markdown>
-            </View>
-        );
-    };
+    // Memoized render function to prevent re-renders
+    const renderItem = useCallback(({ item }: { item: Message }) => (
+        <MessageItem item={item} />
+    ), []);
 
     return (
         <View style={{ flex: 1, backgroundColor: '#fafafa' }}>
@@ -317,10 +438,10 @@ export default function ChatScreen() {
                             contentContainerStyle={[styles.chatListContent, { paddingBottom: bottomPadding }]}
                             ListFooterComponent={
                                 isLoading ?
-                                <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="small" color="#007AFF" />
-                                </View> :
-                                <View style={{ height: 20 }} />
+                                    <View style={styles.loadingContainer}>
+                                        <ActivityIndicator size="small" color="#007AFF" />
+                                    </View> :
+                                    <View style={{ height: 20 }} />
                             }
                             keyboardDismissMode="interactive"
                         />
@@ -366,115 +487,3 @@ export default function ChatScreen() {
         </View>
     );
 }
-
-const markdownStyles = StyleSheet.create({
-    body: { fontSize: 16, color: '#1a1a1a', lineHeight: 24, fontFamily: 'System' },
-    paragraph: { marginBottom: 10 },
-    heading1: { fontSize: 22, fontWeight: '700', marginVertical: 10, color: '#000' },
-    heading2: { fontSize: 20, fontWeight: '600', marginVertical: 8, color: '#000' },
-    heading3: { fontSize: 18, fontWeight: '600', marginVertical: 6, color: '#000' },
-    list_item: { marginBottom: 6 },
-    bullet_list_icon: { marginLeft: 0, marginRight: 8, fontSize: 16, color: '#1a1a1a' },
-    code_inline: {
-        backgroundColor: '#f0f0f0',
-        padding: 2,
-        borderRadius: 4,
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-        fontSize: 14
-    },
-    code_block: { backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8, marginVertical: 10, borderWidth: 0 },
-    fence: { backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8, marginVertical: 10, borderWidth: 0 },
-    link: { color: '#007AFF', textDecorationLine: 'none' },
-    strong: { fontWeight: '700', color: '#000' },
-});
-
-const styles = StyleSheet.create({
-    mainContainer: { flex: 1, backgroundColor: 'transparent' },
-    contentContainer: { flex: 1, backgroundColor: 'transparent' },
-    header: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 10,
-        paddingHorizontal: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-    },
-    iconButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#FFFFFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 3
-    },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a' },
-    chatListContent: { paddingBottom: 100 },
-    messageRow: { flexDirection: 'row', marginBottom: 12, width: '100%' },
-    userRow: { justifyContent: 'flex-end', paddingRight: 16 },
-    aiRow: { justifyContent: 'flex-start' },
-    messageBubble: {
-        padding: 14,
-        borderRadius: 20,
-        maxWidth: '80%',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1
-    },
-    userBubble: { backgroundColor: '#000000', borderBottomRightRadius: 4 },
-    messageText: { fontSize: 16, lineHeight: 24 },
-    userText: { color: '#FFFFFF' },
-    loadingContainer: { padding: 10, marginLeft: 16 },
-    stickyView: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'transparent',
-    },
-    inputWrapper: {
-        width: '100%',
-        paddingHorizontal: 20,
-        backgroundColor: '#FFFFFF',
-        paddingTop: 10,
-    },
-    floatingInputBar: {
-        flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 30,
-        padding: 6,
-        paddingLeft: 20,
-        width: '100%',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 5,
-        alignItems: 'center',
-    },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        color: '#000',
-        paddingVertical: 10,
-        maxHeight: 100,
-        paddingRight: 10
-    },
-    sendButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#000',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    sendButtonDisabled: { backgroundColor: '#E0E0E0' },
-});
