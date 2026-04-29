@@ -2,6 +2,7 @@
 
 ## Project Structure
 - **/mobile**: React Native (Expo) app.
+- **/web**: Vite + React web app (same backend, faster to iterate on).
 - **/backend**: Python FastAPI server with LangGraph agent.
 
 ## Setup & Running
@@ -16,3 +17,9 @@
 2. Install dependencies: `npm install`
 3. Run app: `npx expo start`
    - Note: WatermelonDB requires native code. Use `npx expo run:android` or use a development build.
+
+### 3. Web
+1. Navigate to `/web`
+2. Install dependencies: `npm install`
+3. Run dev server: `npm run dev`
+   - Defaults to the deployed Cloud Run backend. To use a local backend, create `web/.env.local` with `VITE_API_URL=http://localhost:8000`.

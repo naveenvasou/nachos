@@ -1,0 +1,130 @@
+:root {
+  --bg-wallpaper: #f7f8f9;
+  --bg-card: #fdfbff;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --border-soft: #f3f4f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-wallpaper);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+/* App shell — phone-style frame on wider screens, full-width on mobile */
+.app-shell {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--bg-card);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    margin-top: 24px;
+    margin-bottom: 24px;
+    min-height: calc(100vh - 48px);
+    border-radius: 32px;
+  }
+}
+
+.scroll-area {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbars on horizontal lanes */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* Markdown defaults inside chat */
+.markdown p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+.markdown h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 10px 0;
+}
+.markdown h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 8px 0;
+}
+.markdown h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 6px 0;
+}
+.markdown ul,
+.markdown ol {
+  padding-left: 20px;
+  margin: 0 0 10px;
+}
+.markdown li {
+  margin-bottom: 6px;
+}
+.markdown code {
+  background: #f0f0f0;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+.markdown pre {
+  background: #f0f0f0;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+.markdown a {
+  color: #007aff;
+}
+.markdown strong {
+  font-weight: 700;
+}
