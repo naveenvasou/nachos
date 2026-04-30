@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trash2, RotateCcw, ExternalLink } from 'lucide-react';
 import { loadProfile, saveProfile, clearProfile } from '../profile';
 import { API_URL } from '../api';
+import { track, resetAnalytics } from '../analytics';
+import { clearStreaks } from '../streak';
 
 const ROLES = [
   'Indie founder',
@@ -30,6 +32,7 @@ export default function Settings() {
       workdayEndsAt: end,
       onboardedAt: initial?.onboardedAt ?? new Date().toISOString(),
     });
+    track('settings_saved', { role });
     setSavedAt(Date.now());
   };
 
@@ -45,8 +48,11 @@ export default function Settings() {
       )
     )
       return;
+    track('onboarding_reset');
     clearProfile();
+    clearStreaks();
     localStorage.removeItem('cooper_chat_history_v1');
+    resetAnalytics();
     navigate('/welcome', { replace: true });
   };
 

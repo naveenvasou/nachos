@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { saveProfile } from '../profile';
+import { track, identifyFromProfile } from '../analytics';
 
 const ROLES = [
   'Indie founder',
@@ -19,15 +20,20 @@ export default function Welcome() {
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('18:00');
 
+  useEffect(() => { track('onboarding_started'); }, []);
+
   const finish = () => {
     if (!name.trim()) return;
-    saveProfile({
+    const profile = {
       name: name.trim(),
       role,
       workdayStartsAt: start,
       workdayEndsAt: end,
       onboardedAt: new Date().toISOString(),
-    });
+    };
+    saveProfile(profile);
+    identifyFromProfile(profile);
+    track('onboarding_completed', { role });
     // First-time user → straight into a brief with Cooper.
     navigate('/chat?mode=brief&firstRun=1', { replace: true });
   };

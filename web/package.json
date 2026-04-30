@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "lucide-react": "^0.453.0",
+    "posthog-js": "^1.372.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",

@@ -1,9 +1,14 @@
-# AI Goal Coach
+# Cooper — AI chief of staff
+
+> Voice-first AI coach for people who'd rather talk than type.
+> See **[PRODUCT.md](./PRODUCT.md)** for positioning, ICP, and roadmap;
+> see **[BACKEND_NEXT.md](./BACKEND_NEXT.md)** for the path from
+> single-tenant demo to paid product.
 
 ## Project Structure
-- **/mobile**: React Native (Expo) app.
-- **/web**: Vite + React web app (same backend, faster to iterate on).
-- **/backend**: Python FastAPI server with LangGraph agent.
+- **/web**: Vite + React web app — primary surface, what we ship to users.
+- **/mobile**: React Native (Expo) app — same backend, mobile shell.
+- **/backend**: Python FastAPI server with the LangGraph agent (Cooper).
 
 ## Setup & Running
 

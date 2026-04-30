@@ -1,10 +1,14 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus } from 'lucide-react';
 import StrategyMap from '../components/strategy/StrategyMap';
+import { track } from '../analytics';
 
 export default function Strategy() {
   const navigate = useNavigate();
   const quarterLabel = quarterOf(new Date());
+
+  useEffect(() => { track('strategy_viewed'); }, []);
 
   return (
     <div style={styles.root}>
@@ -19,7 +23,10 @@ export default function Strategy() {
         <button
           style={styles.addButton}
           aria-label="Add a goal"
-          onClick={() => navigate('/chat?mode=plan-goal')}
+          onClick={() => {
+            track('goal_planning_started', { source: 'strategy_header' });
+            navigate('/chat?mode=plan-goal');
+          }}
         >
           <Plus size={20} color="#fff" />
         </button>

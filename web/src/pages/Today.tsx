@@ -8,7 +8,9 @@ import {
   fetchTasks, fetchGoals, updateTask, pickTodaysPlan,
   type Task, type Goal,
 } from '../api';
-import { loadProfile, greeting, dayPhase, type Profile } from '../profile';
+import { loadProfile, greeting, dayPhase } from '../profile';
+import { track } from '../analytics';
+import { getStreaks, type Streaks } from '../streak';
 
 export default function Today() {
   const navigate = useNavigate();
@@ -16,12 +18,14 @@ export default function Today() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [streaks, setStreaks] = useState<Streaks>(() => getStreaks());
 
   const reload = useCallback(async () => {
     try {
       const [t, g] = await Promise.all([fetchTasks(), fetchGoals()]);
       setTasks(t);
       setGoals(g);
+      setStreaks(getStreaks());
     } catch (e) {
       console.error(e);
     } finally {
@@ -29,7 +33,10 @@ export default function Today() {
     }
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    track('today_viewed');
+    reload();
+  }, [reload]);
 
   // Refetch when window regains focus — the user just came back from chat,
   // where Cooper may have written new tasks.
@@ -45,12 +52,16 @@ export default function Today() {
 
   const toggle = async (task: Task) => {
     const next = task.status === 'DONE' ? 'TODO' : 'DONE';
+    track('task_toggled', { from: task.status, to: next, task_id: task.id });
     setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: next } : t)));
     try { await updateTask(task.id, { status: next }); }
     catch { setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t))); }
   };
 
-  const onFocus = (taskId: number) => navigate(`/focus?taskId=${taskId}`);
+  const onFocus = (taskId: number) => {
+    track('task_focus_started', { task_id: taskId, source: 'today' });
+    navigate(`/focus?taskId=${taskId}`);
+  };
 
   return (
     <div className="scroll-area" style={styles.root}>
@@ -67,6 +78,7 @@ export default function Today() {
 
         <BriefCard
           mode={primaryMode}
+          streaks={streaks}
           onClick={() => navigate(`/chat?mode=${primaryMode}`)}
         />
 
@@ -103,21 +115,41 @@ export default function Today() {
   );
 }
 
-function BriefCard({ mode, onClick }: { mode: 'brief' | 'review'; onClick: () => void }) {
+function BriefCard({
+  mode, streaks, onClick,
+}: {
+  mode: 'brief' | 'review';
+  streaks: Streaks;
+  onClick: () => void;
+}) {
   const isMorning = mode === 'brief';
+  const doneToday = isMorning ? streaks.briefToday : streaks.reviewToday;
+  const streak = streaks.combined;
   return (
     <button onClick={onClick} style={{ ...styles.briefCard, background: isMorning ? '#efe9ff' : '#fff8e1' }}>
       <div style={styles.briefIcon}>
         {isMorning ? <Sun size={22} color="#8B5CF6" /> : <Moon size={22} color="#b45309" />}
       </div>
       <div style={{ flex: 1, textAlign: 'left' }}>
-        <div style={styles.briefKicker}>
-          {isMorning ? 'TWO MINUTES · MORNING BRIEF' : 'TWO MINUTES · EVENING REVIEW'}
+        <div style={styles.briefKickerRow}>
+          <span style={styles.briefKicker}>
+            {isMorning ? 'TWO MINUTES · MORNING BRIEF' : 'TWO MINUTES · EVENING REVIEW'}
+          </span>
+          {streak > 1 && (
+            <span style={styles.streakChip}>
+              <Flame size={11} color="#dc2626" />
+              <span>{streak}</span>
+            </span>
+          )}
         </div>
         <div style={styles.briefTitle}>
-          {isMorning
-            ? "Plan today's top-3 with Cooper."
-            : 'Close out the day with Cooper.'}
+          {doneToday
+            ? isMorning
+              ? 'Tweak today\'s plan with Cooper.'
+              : 'Reflect again with Cooper.'
+            : isMorning
+              ? 'Plan today\'s top-3 with Cooper.'
+              : 'Close out the day with Cooper.'}
         </div>
       </div>
       <ArrowRight size={20} color={isMorning ? '#8B5CF6' : '#b45309'} />
@@ -353,10 +385,18 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.6)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
+  briefKickerRow: {
+    display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4,
+  },
   briefKicker: {
     fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
     color: 'rgba(31,31,31,0.55)', textTransform: 'uppercase' as const,
-    marginBottom: 4,
+  },
+  streakChip: {
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+    padding: '2px 7px', borderRadius: 999,
+    background: '#fef2f2', color: '#dc2626',
+    fontSize: 11, fontWeight: 700,
   },
   briefTitle: { fontSize: 16, fontWeight: 700, color: '#1f1f1f', lineHeight: 1.3 },
 

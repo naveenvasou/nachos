@@ -4,6 +4,7 @@ import { ArrowLeft, Check } from 'lucide-react';
 import CircularTimer from '../components/focus/CircularTimer';
 import FocusControls from '../components/focus/FocusControls';
 import { fetchTasks, updateTask, type Task } from '../api';
+import { track } from '../analytics';
 
 const DURATION = 25 * 60;
 
@@ -41,15 +42,16 @@ export default function Focus() {
     if (timeLeft <= 0) {
       setIsActive(false);
       setCompletedSession(true);
-      // Best-effort beep + vibration so the user notices on tab focus.
-      try {
-        navigator.vibrate?.(300);
-      } catch { /* ignore */ }
+      track('focus_session_completed', {
+        task_id: taskId,
+        duration_seconds: DURATION,
+      });
+      try { navigator.vibrate?.(300); } catch { /* ignore */ }
       return;
     }
     const id = setInterval(() => setTimeLeft((p) => p - 1), 1000);
     return () => clearInterval(id);
-  }, [isActive, timeLeft]);
+  }, [isActive, timeLeft, taskId]);
 
   const handleReset = () => {
     setIsActive(false);
@@ -61,6 +63,7 @@ export default function Focus() {
     if (!task) return;
     try {
       await updateTask(task.id, { status: 'DONE' });
+      track('focus_task_marked_done', { task_id: task.id });
       navigate('/');
     } catch (e) {
       console.error(e);
@@ -105,7 +108,12 @@ export default function Focus() {
 
         <FocusControls
           isActive={isActive}
-          onToggle={() => setIsActive((v) => !v)}
+          onToggle={() => {
+            setIsActive((v) => {
+              if (!v) track('focus_session_started', { task_id: taskId });
+              return !v;
+            });
+          }}
           onReset={handleReset}
         />
 

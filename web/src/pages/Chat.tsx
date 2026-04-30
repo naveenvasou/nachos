@@ -6,6 +6,8 @@ import { API_URL, fetchChatHistory, streamChat } from '../api';
 import MicButton from '../components/chat/MicButton';
 import { loadProfile } from '../profile';
 import { seedFor, modeTitle, type ChatMode } from '../seeds';
+import { track } from '../analytics';
+import { recordBrief, recordReview } from '../streak';
 
 interface Message {
   id: string;
@@ -92,6 +94,25 @@ export default function Chat() {
     const trimmed = (override ?? input).trim();
     if (!trimmed || isLoading) return;
 
+    // Loop instrumentation: the *first* message in a mode counts as starting
+    // the brief/review for the day. PostHog gets a granular event per send.
+    const isSeedSend = override !== undefined;
+    track('chat_message_sent', {
+      mode,
+      is_seed: isSeedSend,
+      char_count: trimmed.length,
+      is_first_in_thread: messages.length === 0,
+    });
+    if (isSeedSend) track('chat_seed_sent', { mode });
+    if (mode === 'brief' && messages.length === 0) {
+      track('brief_started');
+      recordBrief();
+    }
+    if (mode === 'review' && messages.length === 0) {
+      track('review_started');
+      recordReview();
+    }
+
     const userMsg: Message = { id: String(Date.now()), text: trimmed, sender: 'user' };
     const withUser = [...messages, userMsg];
     setMessages(withUser);
@@ -137,6 +158,7 @@ export default function Chat() {
 
   const startRecording = async () => {
     try {
+      track('chat_voice_started', { mode });
       setIsRecording(true);
       const baseText = input;
       let sessionCommitted = '';
@@ -199,6 +221,7 @@ export default function Chat() {
   };
 
   const stopRecording = () => {
+    track('chat_voice_stopped', { mode });
     setIsRecording(false);
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
