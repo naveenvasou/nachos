@@ -5,26 +5,39 @@ import {
   Check, Flame, ChevronRight, Settings as SettingsIcon, Sparkles,
 } from 'lucide-react';
 import {
-  fetchTasks, fetchGoals, updateTask, pickTodaysPlan,
-  type Task, type Goal,
+  fetchTasks, fetchGoals, fetchHabits, fetchServerStreak,
+  updateTask, pickTodaysPlan,
+  type Task, type Goal, type Habit, type ServerStreak,
 } from '../api';
 import { loadProfile, greeting, dayPhase } from '../profile';
 import { track } from '../analytics';
 import { getStreaks, type Streaks } from '../streak';
+import HabitStrip from '../components/today/HabitStrip';
 
 export default function Today() {
   const navigate = useNavigate();
   const profile = loadProfile();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [serverStreak, setServerStreak] = useState<ServerStreak | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [streaks, setStreaks] = useState<Streaks>(() => getStreaks());
 
   const reload = useCallback(async () => {
     try {
-      const [t, g] = await Promise.all([fetchTasks(), fetchGoals()]);
+      // /habits, /reflections, /streak are new on the backend; if the server
+      // hasn't been redeployed yet they 404. Tolerate that — UI still works.
+      const [t, g, h, s] = await Promise.all([
+        fetchTasks(),
+        fetchGoals(),
+        fetchHabits().catch(() => [] as Habit[]),
+        fetchServerStreak().catch(() => null),
+      ]);
       setTasks(t);
       setGoals(g);
+      setHabits(h);
+      setServerStreak(s);
       setStreaks(getStreaks());
     } catch (e) {
       console.error(e);
@@ -79,6 +92,7 @@ export default function Today() {
         <BriefCard
           mode={primaryMode}
           streaks={streaks}
+          serverStreak={serverStreak}
           onClick={() => navigate(`/chat?mode=${primaryMode}`)}
         />
 
@@ -96,6 +110,8 @@ export default function Today() {
           onStrategy={() => navigate('/strategy')}
           onPlanGoal={() => navigate('/chat?mode=plan-goal')}
         />
+
+        <HabitStrip habits={habits} loaded={loaded} />
 
         {alsoToday.length > 0 && (
           <AlsoTodayList tasks={alsoToday} onToggle={toggle} onFocus={onFocus} />
@@ -116,15 +132,20 @@ export default function Today() {
 }
 
 function BriefCard({
-  mode, streaks, onClick,
+  mode, streaks, serverStreak, onClick,
 }: {
   mode: 'brief' | 'review';
   streaks: Streaks;
+  serverStreak: ServerStreak | null;
   onClick: () => void;
 }) {
   const isMorning = mode === 'brief';
   const doneToday = isMorning ? streaks.briefToday : streaks.reviewToday;
-  const streak = streaks.combined;
+  // Local loop streak (brief/review days). Server streak (consecutive
+  // task-completion days) is shown as a separate chip below.
+  const loopStreak = streaks.combined;
+  const taskStreak = serverStreak?.current_streak ?? 0;
+
   return (
     <button onClick={onClick} style={{ ...styles.briefCard, background: isMorning ? '#efe9ff' : '#fff8e1' }}>
       <div style={styles.briefIcon}>
@@ -135,10 +156,19 @@ function BriefCard({
           <span style={styles.briefKicker}>
             {isMorning ? 'TWO MINUTES · MORNING BRIEF' : 'TWO MINUTES · EVENING REVIEW'}
           </span>
-          {streak > 1 && (
-            <span style={styles.streakChip}>
+          {loopStreak > 1 && (
+            <span style={styles.streakChip} title="Brief/review streak">
               <Flame size={11} color="#dc2626" />
-              <span>{streak}</span>
+              <span>{loopStreak}</span>
+            </span>
+          )}
+          {taskStreak > 1 && (
+            <span
+              style={{ ...styles.streakChip, background: '#ecfdf5', color: '#059669' }}
+              title="Task-completion streak"
+            >
+              <Flame size={11} color="#059669" />
+              <span>{taskStreak}</span>
             </span>
           )}
         </div>

@@ -73,7 +73,9 @@ export type AnalyticsEvent =
   | 'chat_voice_stopped'
   | 'strategy_viewed'
   | 'goal_planning_started'
-  | 'settings_saved';
+  | 'settings_saved'
+  | 'habit_log_clicked'
+  | 'habit_create_clicked';
 
 export function track(
   event: AnalyticsEvent,

@@ -127,6 +127,7 @@ export default function Chat() {
     try {
       let lastFull = '';
       await streamChat(trimmed, {
+        mode,
         onToken: (_t, full) => {
           lastFull = full;
           setMessages((prev) =>

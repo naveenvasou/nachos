@@ -31,6 +31,30 @@ export interface ChatHistoryMessage {
   tool_calls?: unknown;
 }
 
+export interface Habit {
+  habit_id: number;
+  title: string;
+  frequency: string;
+  current_streak: number;
+  longest_streak: number;
+  completion_rate: number;
+  total_logs: number;
+  logged_today: boolean;
+}
+
+export interface Reflection {
+  id: number;
+  content: string;
+  reflection_type: string;
+  created_at: string;
+}
+
+export interface ServerStreak {
+  current_streak: number;
+  longest_streak: number;
+  total_productive_days: number;
+}
+
 export function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
@@ -71,6 +95,28 @@ export async function fetchChatHistory(): Promise<ChatHistoryMessage[]> {
   return res.json();
 }
 
+export async function fetchHabits(): Promise<Habit[]> {
+  const res = await fetch(`${API_URL}/habits`);
+  if (!res.ok) throw new Error(`Failed to fetch habits: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchReflections(opts: { limit?: number; type?: string } = {}): Promise<Reflection[]> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.type) params.set('type', opts.type);
+  const qs = params.toString();
+  const res = await fetch(`${API_URL}/reflections${qs ? '?' + qs : ''}`);
+  if (!res.ok) throw new Error(`Failed to fetch reflections: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchServerStreak(): Promise<ServerStreak> {
+  const res = await fetch(`${API_URL}/streak`);
+  if (!res.ok) throw new Error(`Failed to fetch streak: ${res.status}`);
+  return res.json();
+}
+
 /**
  * Today's plan = top tasks scheduled for today, ordered by priority.
  * Top-3 doctrine: cap at 3 visible "must-dos"; the rest are "also today".
@@ -97,19 +143,26 @@ export function pickTodaysPlan(tasks: Task[]): { topThree: Task[]; alsoToday: Ta
 /**
  * Stream a chat message from /chat/stream and call onToken / onDone as
  * SSE events arrive. Returns the final text.
+ *
+ * `mode` (optional) tells Cooper to run a specific skill — 'brief',
+ * 'review', 'capture', 'plan-goal'. Backend overlays the matching
+ * prompt/<mode>_skill.md on top of the base system prompt for this turn.
  */
 export async function streamChat(
   message: string,
   opts: {
+    mode?: string;
     onToken?: (token: string, full: string) => void;
     onDone?: (full: string) => void;
     signal?: AbortSignal;
   } = {}
 ): Promise<string> {
+  const body: Record<string, unknown> = { message };
+  if (opts.mode && opts.mode !== 'free') body.mode = opts.mode;
   const res = await fetch(`${API_URL}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(body),
     signal: opts.signal,
   });
   if (!res.ok || !res.body) throw new Error(`Stream failed: ${res.status}`);
