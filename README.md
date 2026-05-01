@@ -1,8 +1,14 @@
-# AI Goal Coach
+# Cooper — AI chief of staff
+
+> Voice-first AI coach for people who'd rather talk than type.
+> See **[PRODUCT.md](./PRODUCT.md)** for positioning, ICP, and roadmap;
+> see **[BACKEND_NEXT.md](./BACKEND_NEXT.md)** for the path from
+> single-tenant demo to paid product.
 
 ## Project Structure
-- **/mobile**: React Native (Expo) app.
-- **/backend**: Python FastAPI server with LangGraph agent.
+- **/web**: Vite + React web app — primary surface, what we ship to users.
+- **/mobile**: React Native (Expo) app — same backend, mobile shell.
+- **/backend**: Python FastAPI server with the LangGraph agent (Cooper).
 
 ## Setup & Running
 
@@ -16,3 +22,9 @@
 2. Install dependencies: `npm install`
 3. Run app: `npx expo start`
    - Note: WatermelonDB requires native code. Use `npx expo run:android` or use a development build.
+
+### 3. Web
+1. Navigate to `/web`
+2. Install dependencies: `npm install`
+3. Run dev server: `npm run dev`
+   - Defaults to the deployed Cloud Run backend. To use a local backend, create `web/.env.local` with `VITE_API_URL=http://localhost:8000`.

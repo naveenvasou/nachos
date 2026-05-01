@@ -49,6 +49,9 @@ groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 class ChatRequest(BaseModel):
     message: str
+    # Optional skill mode: 'brief', 'review', 'capture', 'plan-goal'.
+    # When set, Cooper runs the corresponding skill prompt for this turn.
+    mode: Optional[str] = None
 
 from fastapi.responses import StreamingResponse
 import json
@@ -69,7 +72,7 @@ def register_push_token(request: PushTokenRequest):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    response_text = await run_chat_agent(request.message)
+    response_text = await run_chat_agent(request.message, mode=request.mode)
     return {"response": response_text}
 
 @app.post("/chat/stream")
@@ -80,7 +83,7 @@ async def chat_stream(request: ChatRequest):
     async def event_generator():
         full_response = ""
         # Get streaming response from agent (Async Generator)
-        stream = await run_chat_agent(request.message, stream=True)
+        stream = await run_chat_agent(request.message, stream=True, mode=request.mode)
         
         print("Starting stream generation...")
         try:
@@ -264,6 +267,24 @@ def update_task_endpoint(task_id: int, update: TaskUpdate):
 @app.get("/goals")
 def get_goals():
     return database.list_goals()
+
+# --- Read-only surfaces for the web UI ---
+# (Mutations stay agent-driven via Cooper's tools.)
+
+@app.get("/habits")
+def get_habits():
+    """List active habits with streaks + completion rates."""
+    return database.get_habit_streaks()
+
+@app.get("/reflections")
+def get_reflections(limit: int = 10, type: Optional[str] = None):
+    """Recent reflections. `type` filters by reflection_type (daily/weekly/milestone)."""
+    return database.get_recent_reflections(limit=limit, reflection_type=type)
+
+@app.get("/streak")
+def get_streak():
+    """Task-completion streak: consecutive days with at least one DONE task."""
+    return database.get_streak_data()
 
 # --- Debug / Inspector Endpoints ---
 import debug

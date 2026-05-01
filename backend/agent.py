@@ -2,7 +2,7 @@ import json
 import os
 import asyncio
 from datetime import datetime
-from typing import TypedDict, List
+from typing import TypedDict, List, Optional
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -341,13 +341,17 @@ RULES:
 # Entry point
 # ---------------------------------------------------------------------------
 
-async def run_chat_agent_async(user_message: str, stream: bool = False):
+async def run_chat_agent_async(user_message: str, stream: bool = False, mode: Optional[str] = None):
     """
     Main agent runner.
 
-    Returns:
-        str              if stream=False
-        AsyncGenerator   if stream=True  (yields types.Part)
+    Args:
+        user_message: The user's input.
+        stream:      If True, returns an AsyncGenerator yielding types.Part.
+                     If False, returns the final response string.
+        mode:        Optional skill mode — one of 'brief', 'review',
+                     'capture', 'plan-goal'. When set, Cooper runs the
+                     matching skill from prompts/<mode>_skill.md.
     """
     # 1. Persist the user message
     database.add_message('user', f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {user_message}")
@@ -358,8 +362,8 @@ async def run_chat_agent_async(user_message: str, stream: bool = False):
     # 3. Kick off summarization in the background — don't block the response
     asyncio.create_task(summarize_memory_if_needed(summary_text, buffer_dicts))
 
-    # 4. Build system prompt once, passing cached summary (avoids extra DB call)
-    system_prompt = prompts.get_system_context(summary_text=summary_text)
+    # 4. Build system prompt once, passing cached summary AND active mode
+    system_prompt = prompts.get_system_context(summary_text=summary_text, mode=mode)
 
     # 5. Reconstruct conversation history from the cached buffer
     initial_messages = load_history_from_db(buffer_dicts)
